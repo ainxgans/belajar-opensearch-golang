@@ -1,0 +1,39 @@
+# Go
+/bin/
+/api
+/indexer
+*.exe
+*.test
+*.out
+vendor/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Node / frontend (web/)
+node_modules/
+web/dist/
+web/.vite/
+web/.tsconfig.tsbuildinfo
+web/tsconfig.tsbuildinfo
+*.log
+
+# Docker / data volumes
+/data/
+pgdata/
+opensearch-data/
+kafka-data/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Superpowers
+.superpowers/
+docs/
