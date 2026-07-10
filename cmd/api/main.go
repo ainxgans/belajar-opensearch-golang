@@ -28,7 +28,7 @@ func env(k, def string) string {
 // waitDB pings db until it answers or gives up after ~60s.
 func waitDB(db *sql.DB) error {
 	var err error
-	for i := 0; i < 30; i++ {
+	for range 30 {
 		if err = db.Ping(); err == nil {
 			return nil
 		}
