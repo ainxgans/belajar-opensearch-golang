@@ -52,7 +52,7 @@ func QueryStrings(r *http.Request, key string) []string {
 	raw := r.URL.Query()[key]
 	out := []string{}
 	for _, v := range raw {
-		for _, part := range strings.Split(v, ",") {
+		for part := range strings.SplitSeq(v, ",") {
 			if p := strings.TrimSpace(part); p != "" {
 				out = append(out, p)
 			}
