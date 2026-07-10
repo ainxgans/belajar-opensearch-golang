@@ -105,10 +105,7 @@ func Generate(cfg GenerateConfig) []Product {
 
 // pickTags returns a random subset (0..3) of pool, no duplicates.
 func pickTags(rng *rand.Rand, pool []string) []string {
-	n := rng.Intn(4) // 0..3
-	if n > len(pool) {
-		n = len(pool)
-	}
+	n := min(rng.Intn(4), len(pool)) // 0..3
 	if n == 0 {
 		return nil
 	}
@@ -122,10 +119,7 @@ func pickTags(rng *rand.Rand, pool []string) []string {
 
 // pickAttributes returns 0..attrMax random attributes from attrPool.
 func pickAttributes(rng *rand.Rand, attrMax int) []Attribute {
-	n := rng.Intn(attrMax + 1)
-	if n > len(attrPool) {
-		n = len(attrPool)
-	}
+	n := min(rng.Intn(attrMax+1), len(attrPool))
 	if n == 0 {
 		return nil
 	}
