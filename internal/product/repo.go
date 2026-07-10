@@ -5,8 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"strings"
 )
 
 // ErrNotFound is returned when a lookup by id matches no row.
@@ -24,16 +23,30 @@ func NewRepo(db *sql.DB) *Repo {
 	return &Repo{db: db}
 }
 
+// parsePGTextArray parses a Postgres text[] literal like "{a,b,c}" into a
+// []string. The pgx stdlib driver (database/sql) hands array columns back
+// as their raw text form rather than decoding them into a Go slice or a
+// pgtype.Scanner (that decoding only happens via pgx's native, non-sql.DB
+// interface), so it has to be parsed here instead of scanned directly.
+func parsePGTextArray(s string) []string {
+	s = strings.TrimPrefix(s, "{")
+	s = strings.TrimSuffix(s, "}")
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, ",")
+}
+
 func scanProduct(row interface{ Scan(...any) error }) (Product, error) {
 	var p Product
-	var tags pgtype.FlatArray[string]
+	var tagsRaw string
 	var attrsRaw []byte
 	err := row.Scan(&p.ID, &p.SKU, &p.Name, &p.Description, &p.Brand, &p.Category,
-		&p.Price, &p.Stock, &p.Rating, &tags, &attrsRaw, &p.CreatedAt, &p.UpdatedAt)
+		&p.Price, &p.Stock, &p.Rating, &tagsRaw, &attrsRaw, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return Product{}, err
 	}
-	p.Tags = []string(tags)
+	p.Tags = parsePGTextArray(tagsRaw)
 	if len(attrsRaw) > 0 {
 		if err := json.Unmarshal(attrsRaw, &p.Attributes); err != nil {
 			return Product{}, err
@@ -119,17 +132,21 @@ func (r *Repo) Get(ctx context.Context, id int64) (Product, error) {
 }
 
 // BulkInsert writes products in batches, each batch committed as its own
-// transaction. It is idempotent: rows are keyed by product id via
-// ON CONFLICT (id) DO UPDATE, so re-running the same slice is a no-op after
+// transaction. It is idempotent: rows are keyed by sku via
+// ON CONFLICT (sku) DO UPDATE, so re-running the same slice is a no-op after
 // the first successful run. Returns the number of rows written.
 func (r *Repo) BulkInsert(ctx context.Context, products []Product, batch int) (int, error) {
 	if batch <= 0 {
 		batch = len(products)
 	}
-	const q = `INSERT INTO products (id,sku,name,description,brand,category,price,stock,rating,tags,attributes,created_at,updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-ON CONFLICT (id) DO UPDATE SET
-sku=EXCLUDED.sku, name=EXCLUDED.name, description=EXCLUDED.description,
+	// ponytail: id is GENERATED ALWAYS AS IDENTITY, so Postgres rejects an
+	// explicit value for it ("cannot insert a non-DEFAULT value into column
+	// id"). Generated products also don't carry a real id yet, so key the
+	// upsert on sku (unique, deterministic per seed+prefix+index) instead.
+	const q = `INSERT INTO products (sku,name,description,brand,category,price,stock,rating,tags,attributes,created_at,updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+ON CONFLICT (sku) DO UPDATE SET
+name=EXCLUDED.name, description=EXCLUDED.description,
 brand=EXCLUDED.brand, category=EXCLUDED.category, price=EXCLUDED.price,
 stock=EXCLUDED.stock, rating=EXCLUDED.rating, tags=EXCLUDED.tags,
 attributes=EXCLUDED.attributes, updated_at=EXCLUDED.updated_at`
@@ -167,7 +184,7 @@ func (r *Repo) insertBatch(ctx context.Context, q string, batch []Product) error
 		if tags == nil {
 			tags = []string{}
 		}
-		if _, err := stmt.ExecContext(ctx, p.ID, p.SKU, p.Name, p.Description, p.Brand, p.Category,
+		if _, err := stmt.ExecContext(ctx, p.SKU, p.Name, p.Description, p.Brand, p.Category,
 			p.Price, p.Stock, p.Rating, tags, attrs, p.CreatedAt, p.UpdatedAt); err != nil {
 			return err
 		}

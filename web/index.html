@@ -4,8 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Catalog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = { darkMode: "media" };
+    </script>
   </head>
-  <body>
+  <body class="bg-[#f8f9fa] dark:bg-[#0f172a] text-[#1a202c] dark:text-[#f1f5f9]">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

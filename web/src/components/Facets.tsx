@@ -29,19 +29,22 @@ function RadioGroup({
 }) {
   if (!buckets.length) return null;
   return (
-    <div style={{ marginBottom: 16 }}>
-      <strong>{title}</strong>
-      {buckets.map((b) => (
-        <label key={b.key} style={{ display: "block", fontSize: 14 }}>
-          <input
-            type="radio"
-            name={title}
-            checked={value === b.key}
-            onChange={() => onSelect(value === b.key ? undefined : b.key)}
-          />{" "}
-          {b.key} ({b.doc_count})
-        </label>
-      ))}
+    <div className="mb-4">
+      <strong className="text-sm font-semibold">{title}</strong>
+      <div className="mt-1 flex flex-col gap-1">
+        {buckets.map((b) => (
+          <label key={b.key} className="flex items-center gap-1.5 text-sm">
+            <input
+              type="radio"
+              name={title}
+              checked={value === b.key}
+              onChange={() => onSelect(value === b.key ? undefined : b.key)}
+              className="accent-blue-500"
+            />
+            {b.key} ({b.doc_count})
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
@@ -53,8 +56,11 @@ export default function Facets({ facets, params, onChange, onReset }: Props) {
   const attrNames: AttrBucket[] = facets.attributes?.names?.buckets ?? [];
 
   return (
-    <div style={{ width: 220 }}>
-      <button onClick={onReset} style={{ marginBottom: 16 }}>
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-[#1e293b]">
+      <button
+        onClick={onReset}
+        className="mb-4 w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-[#1a202c] transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-[#1e293b] dark:text-[#f1f5f9] dark:hover:bg-gray-800"
+      >
         Reset filters
       </button>
 
@@ -72,28 +78,28 @@ export default function Facets({ facets, params, onChange, onReset }: Props) {
         onSelect={(v) => onChange({ tags: v ? [v] : undefined })}
       />
 
-      <div style={{ marginBottom: 16 }}>
-        <strong>Price</strong>
-        <div style={{ display: "flex", gap: 4 }}>
+      <div className="mb-4">
+        <strong className="text-sm font-semibold">Price</strong>
+        <div className="mt-1 flex gap-2">
           <input
             type="number"
             placeholder="min"
             value={params.price_min ?? ""}
             onChange={(e) => onChange({ price_min: e.target.value ? Number(e.target.value) : undefined })}
-            style={{ width: "50%" }}
+            className="w-1/2 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-[#1a202c] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-[#0f172a] dark:text-[#f1f5f9]"
           />
           <input
             type="number"
             placeholder="max"
             value={params.price_max ?? ""}
             onChange={(e) => onChange({ price_max: e.target.value ? Number(e.target.value) : undefined })}
-            style={{ width: "50%" }}
+            className="w-1/2 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-[#1a202c] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-[#0f172a] dark:text-[#f1f5f9]"
           />
         </div>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <strong>Min rating</strong>
+      <div className="mb-4">
+        <strong className="text-sm font-semibold">Min rating</strong>
         <input
           type="number"
           min={0}
@@ -101,6 +107,7 @@ export default function Facets({ facets, params, onChange, onReset }: Props) {
           step={0.1}
           value={params.rating_min ?? ""}
           onChange={(e) => onChange({ rating_min: e.target.value ? Number(e.target.value) : undefined })}
+          className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-[#1a202c] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-[#0f172a] dark:text-[#f1f5f9]"
         />
       </div>
 

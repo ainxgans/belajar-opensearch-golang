@@ -26,13 +26,13 @@ export default function SearchBar({ value, onSearch }: Props) {
   }
 
   return (
-    <div style={{ position: "relative", maxWidth: 480 }}>
+    <div className="relative max-w-[480px]">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           submit(text);
         }}
-        style={{ display: "flex", gap: 8 }}
+        className="flex gap-2"
       >
         <input
           value={text}
@@ -43,27 +43,23 @@ export default function SearchBar({ value, onSearch }: Props) {
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           placeholder="Search products…"
-          style={{ flex: 1, padding: 8 }}
+          className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-[#1a202c] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-[#1e293b] dark:text-[#f1f5f9]"
         />
-        <button type="submit">Search</button>
+        <button
+          type="submit"
+          className="rounded-md bg-blue-500 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-600"
+        >
+          Search
+        </button>
       </form>
       {showSuggestions && suggestions.length > 0 && (
-        <ul
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            background: "#fff",
-            border: "1px solid #ddd",
-            listStyle: "none",
-            margin: 0,
-            padding: 4,
-            zIndex: 10,
-          }}
-        >
+        <ul className="absolute left-0 right-0 top-full z-10 mt-1 list-none rounded-md border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-[#1e293b]">
           {suggestions.map((s) => (
-            <li key={s} style={{ padding: 4, cursor: "pointer" }} onMouseDown={() => submit(s)}>
+            <li
+              key={s}
+              className="cursor-pointer rounded px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800"
+              onMouseDown={() => submit(s)}
+            >
               {s}
             </li>
           ))}

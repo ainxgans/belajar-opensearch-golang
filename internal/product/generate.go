@@ -3,6 +3,7 @@ package product
 import (
 	"fmt"
 	"math/rand"
+	"time"
 )
 
 var (
@@ -80,6 +81,7 @@ func pickSkewed(rng *rand.Rand, n int) int {
 func Generate(cfg GenerateConfig) []Product {
 	cfg = defaultsFor(cfg)
 	rng := rand.New(rand.NewSource(cfg.Seed))
+	now := time.Now()
 
 	products := make([]Product, 0, cfg.Count)
 	for i := 0; i < cfg.Count; i++ {
@@ -97,6 +99,8 @@ func Generate(cfg GenerateConfig) []Product {
 			Rating:      roundTo1Decimal(rng.Float64() * 5.0),
 			Tags:        pickTags(rng, cfg.Tags),
 			Attributes:  pickAttributes(rng, cfg.AttrMax),
+			CreatedAt:   now,
+			UpdatedAt:   now,
 		}
 		products = append(products, p)
 	}

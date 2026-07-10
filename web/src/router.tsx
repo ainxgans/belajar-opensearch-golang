@@ -5,13 +5,19 @@ import GeneratorPage from "./routes/generator";
 
 function RootLayout() {
   return (
-    <div>
-      <nav style={{ display: "flex", gap: 16, padding: 12, borderBottom: "1px solid #ddd" }}>
-        <Link to="/">Search</Link>
-        <Link to="/new">New product</Link>
-        <Link to="/generator">Generator</Link>
+    <div className="min-h-screen bg-[#f8f9fa] text-[#1a202c] dark:bg-[#0f172a] dark:text-[#f1f5f9]">
+      <nav className="flex gap-4 border-b border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-[#1e293b]">
+        <Link to="/" className="font-medium text-blue-500 hover:text-blue-600 [&.active]:underline">
+          Search
+        </Link>
+        <Link to="/new" className="font-medium text-blue-500 hover:text-blue-600 [&.active]:underline">
+          New product
+        </Link>
+        <Link to="/generator" className="font-medium text-blue-500 hover:text-blue-600 [&.active]:underline">
+          Generator
+        </Link>
       </nav>
-      <main style={{ padding: 16 }}>
+      <main className="p-4">
         <Outlet />
       </main>
     </div>
