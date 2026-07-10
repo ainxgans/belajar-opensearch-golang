@@ -33,8 +33,8 @@ type dbzRow struct {
 	Rating      float64  `json:"rating"`
 	Tags        []string `json:"tags"`
 	Attributes  string   `json:"attributes"` // JSONB arrives as a string
-	CreatedAt   int64    `json:"created_at"` // epoch (time.precision.mode=connect -> ms)
-	UpdatedAt   int64    `json:"updated_at"`
+	CreatedAt   string   `json:"created_at"` // ISO8601 string from Debezium
+	UpdatedAt   string   `json:"updated_at"` // ISO8601 string from Debezium
 }
 
 func env(k, def string) string {
