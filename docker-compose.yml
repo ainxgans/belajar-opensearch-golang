@@ -72,7 +72,7 @@ services:
       retries: 15
 
   connect:
-    image: debezium/connect:2.7
+    image: debezium/connect:2.6
     env_file: .env
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
