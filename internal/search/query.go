@@ -12,6 +12,10 @@ type Params struct {
 	Sort      string            // relevance|price_asc|price_desc|rating|newest
 	Page      int
 	Size      int
+	// SearchAfter carries the sort values of the last hit of the previous
+	// page, for deep cursor pagination (export) that isn't capped by
+	// max_result_window the way from/size is.
+	SearchAfter []any
 }
 
 func (p Params) from() int {
@@ -103,18 +107,22 @@ func (p Params) queryClause() map[string]any {
 }
 
 func sortClause(sort string) []any {
+	var primary []any
 	switch sort {
 	case "price_asc":
-		return []any{map[string]any{"price": "asc"}}
+		primary = []any{map[string]any{"price": "asc"}}
 	case "price_desc":
-		return []any{map[string]any{"price": "desc"}}
+		primary = []any{map[string]any{"price": "desc"}}
 	case "rating":
-		return []any{map[string]any{"rating": "desc"}}
+		primary = []any{map[string]any{"rating": "desc"}}
 	case "newest":
-		return []any{map[string]any{"created_at": "desc"}}
+		primary = []any{map[string]any{"created_at": "desc"}}
 	default:
-		return []any{"_score"}
+		primary = []any{"_score"}
 	}
+	// id tiebreaker makes ordering deterministic across pages, which
+	// search_after (export) requires and from/size benefits from.
+	return append(primary, map[string]any{"id": "asc"})
 }
 
 func aggs() map[string]any {
@@ -158,6 +166,25 @@ func BuildSearch(p Params) map[string]any {
 		body["suggest"] = map[string]any{
 			"dym": map[string]any{"text": p.Q, "term": map[string]any{"field": "name"}},
 		}
+	}
+	return body
+}
+
+// BuildExport builds a lean search body for cursor pagination: no aggs,
+// highlight or suggestions (export doesn't need them, and recomputing aggs
+// per page is wasteful). Uses search_after so it isn't bounded by
+// max_result_window the way from/size is.
+func BuildExport(p Params) map[string]any {
+	body := map[string]any{
+		"size":  p.size(),
+		"query": p.queryClause(),
+		"sort":  sortClause(p.Sort),
+	}
+	if f := p.filters(); len(f) > 0 {
+		body["post_filter"] = map[string]any{"bool": map[string]any{"filter": f}}
+	}
+	if len(p.SearchAfter) > 0 {
+		body["search_after"] = p.SearchAfter
 	}
 	return body
 }

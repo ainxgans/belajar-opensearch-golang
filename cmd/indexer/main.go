@@ -60,6 +60,7 @@ func toDoc(r *dbzRow) map[string]any {
 		"id": r.ID, "sku": r.SKU, "name": r.Name, "description": r.Description,
 		"brand": r.Brand, "category": r.Category, "price": r.Price, "stock": r.Stock,
 		"rating": r.Rating, "tags": tags, "attributes": attrs,
+		"created_at": r.CreatedAt, "updated_at": r.UpdatedAt,
 	}
 }
 
@@ -77,7 +78,9 @@ func main() {
 
 	log.Println("indexer started")
 	for {
-		m, err := reader.ReadMessage(ctx)
+		// FetchMessage does NOT commit; we commit only after a successful
+		// apply so a failed write is redelivered -> real at-least-once.
+		m, err := reader.FetchMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				log.Println("shutting down")
@@ -86,18 +89,22 @@ func main() {
 			log.Printf("read error: %v", err)
 			continue
 		}
-		if len(m.Value) == 0 { // tombstone (op d)
-			continue
+		if len(m.Value) > 0 { // len==0 is a tombstone; nothing to apply
+			var envelope dbzEnvelope
+			if err := json.Unmarshal(m.Value, &envelope); err != nil {
+				// unparseable payload will never succeed; commit and skip it
+				// so it doesn't block the partition forever.
+				log.Printf("bad message, skipping: %v", err)
+			} else if err := apply(ctx, osClient, envelope); err != nil {
+				log.Printf("apply error (op=%s): %v", envelope.Op, err)
+				// offset NOT committed -> message is redelivered next loop.
+				// ponytail: tight retry loop; add backoff/DLQ if a poison
+				// message ever spins here.
+				continue
+			}
 		}
-		var envelope dbzEnvelope
-		if err := json.Unmarshal(m.Value, &envelope); err != nil {
-			log.Printf("bad message: %v", err)
-			continue
-		}
-		if err := apply(ctx, osClient, envelope); err != nil {
-			log.Printf("apply error (op=%s): %v", envelope.Op, err)
-			// don't commit offset on failure -> at-least-once
-			continue
+		if err := reader.CommitMessages(ctx, m); err != nil {
+			log.Printf("commit error: %v", err)
 		}
 	}
 }
