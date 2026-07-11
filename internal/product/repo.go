@@ -23,18 +23,41 @@ func NewRepo(db *sql.DB) *Repo {
 	return &Repo{db: db}
 }
 
-// parsePGTextArray parses a Postgres text[] literal like "{a,b,c}" into a
-// []string. The pgx stdlib driver (database/sql) hands array columns back
-// as their raw text form rather than decoding them into a Go slice or a
+// parsePGTextArray parses a Postgres text[] literal like `{a,"b,c","d ""e"""}`
+// into a []string. The pgx stdlib driver (database/sql) hands array columns
+// back as their raw text form rather than decoding them into a Go slice or a
 // pgtype.Scanner (that decoding only happens via pgx's native, non-sql.DB
 // interface), so it has to be parsed here instead of scanned directly.
+//
+// Postgres quotes any element containing a comma, brace, quote, backslash or
+// whitespace; inside quotes, " and \ are backslash-escaped. A naive
+// strings.Split(",") corrupts such elements, so we walk the literal by hand.
 func parsePGTextArray(s string) []string {
 	s = strings.TrimPrefix(s, "{")
 	s = strings.TrimSuffix(s, "}")
 	if s == "" {
 		return nil
 	}
-	return strings.Split(s, ",")
+	var out []string
+	var cur strings.Builder
+	inQuotes := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == '\\' && i+1 < len(s): // escaped char, take next verbatim
+			i++
+			cur.WriteByte(s[i])
+		case c == '"':
+			inQuotes = !inQuotes
+		case c == ',' && !inQuotes:
+			out = append(out, cur.String())
+			cur.Reset()
+		default:
+			cur.WriteByte(c)
+		}
+	}
+	out = append(out, cur.String())
+	return out
 }
 
 func scanProduct(row interface{ Scan(...any) error }) (Product, error) {

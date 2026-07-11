@@ -63,6 +63,30 @@ func ParseSearch(raw []byte) (SearchResult, error) {
 	return res, nil
 }
 
+type exportResponse struct {
+	Hits struct {
+		Hits []struct {
+			Source product.Product `json:"_source"`
+			Sort   []any           `json:"sort"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+// ParseExportPage returns the page's products plus the sort values of the
+// last hit, to be passed as SearchAfter for the next page. cursor is nil
+// when the page is empty.
+func ParseExportPage(raw []byte) (items []product.Product, cursor []any, err error) {
+	var r exportResponse
+	if err := json.Unmarshal(raw, &r); err != nil {
+		return nil, nil, err
+	}
+	for _, h := range r.Hits.Hits {
+		items = append(items, h.Source)
+		cursor = h.Sort
+	}
+	return items, cursor, nil
+}
+
 type acResponse struct {
 	Suggest struct {
 		Complete []struct {

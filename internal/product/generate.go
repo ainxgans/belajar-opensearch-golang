@@ -85,26 +85,91 @@ func Generate(cfg GenerateConfig) []Product {
 
 	products := make([]Product, 0, cfg.Count)
 	for i := 0; i < cfg.Count; i++ {
-		adj := adjectives[pickSkewed(rng, len(adjectives))]
-		noun := nouns[pickSkewed(rng, len(nouns))]
-
-		p := Product{
-			SKU:         fmt.Sprintf("%s-%d-%d", cfg.Prefix, cfg.Seed, i),
-			Name:        fmt.Sprintf("%s %s %s %d", cfg.Prefix, adj, noun, i),
-			Description: fmt.Sprintf("%s %s, generated for testing.", adj, noun),
-			Brand:       cfg.Brands[pickSkewed(rng, len(cfg.Brands))],
-			Category:    cfg.Categories[pickSkewed(rng, len(cfg.Categories))],
-			Price:       roundToHundred(cfg.PriceMin + rng.Float64()*(cfg.PriceMax-cfg.PriceMin)),
-			Stock:       rng.Intn(501),
-			Rating:      roundTo1Decimal(rng.Float64() * 5.0),
-			Tags:        pickTags(rng, cfg.Tags),
-			Attributes:  pickAttributes(rng, cfg.AttrMax),
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		}
-		products = append(products, p)
+		products = append(products, generateOne(cfg, rng, now, i))
 	}
 	return products
+}
+
+// GenerateStream produces cfg.Count products in slices of at most chunk,
+// invoking fn for each slice. It never holds more than chunk products in
+// memory, so it scales to large counts (e.g. 500k) where Generate's full
+// slice would be wasteful. The slice passed to fn is reused after fn
+// returns, so fn must not retain it.
+func GenerateStream(cfg GenerateConfig, chunk int, fn func([]Product) error) error {
+	cfg = defaultsFor(cfg)
+	if chunk <= 0 {
+		chunk = 1000
+	}
+	rng := rand.New(rand.NewSource(cfg.Seed))
+	now := time.Now()
+
+	buf := make([]Product, 0, chunk)
+	for i := 0; i < cfg.Count; i++ {
+		buf = append(buf, generateOne(cfg, rng, now, i))
+		if len(buf) == chunk {
+			if err := fn(buf); err != nil {
+				return err
+			}
+			buf = buf[:0]
+		}
+	}
+	if len(buf) > 0 {
+		return fn(buf)
+	}
+	return nil
+}
+
+func generateOne(cfg GenerateConfig, rng *rand.Rand, now time.Time, i int) Product {
+	adj := adjectives[pickSkewed(rng, len(adjectives))]
+	noun := nouns[pickSkewed(rng, len(nouns))]
+	return Product{
+		SKU:         fmt.Sprintf("%s-%d-%d", cfg.Prefix, cfg.Seed, i),
+		Name:        fmt.Sprintf("%s %s %s %d", cfg.Prefix, adj, noun, i),
+		Description: fmt.Sprintf("%s %s, generated for testing.", adj, noun),
+		Brand:       cfg.Brands[pickSkewed(rng, len(cfg.Brands))],
+		Category:    cfg.Categories[pickSkewed(rng, len(cfg.Categories))],
+		Price:       roundToHundred(cfg.PriceMin + rng.Float64()*(cfg.PriceMax-cfg.PriceMin)),
+		Stock:       rng.Intn(501),
+		Rating:      roundTo1Decimal(rng.Float64() * 5.0),
+		Tags:        pickTags(rng, cfg.Tags),
+		Attributes:  pickAttributes(rng, cfg.AttrMax),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+}
+
+// BulkGenerateCount is the fixed size of a zero-input bulk seed.
+const BulkGenerateCount = 500_000
+
+// bulk* are larger pools so a 500k seed has realistic facet spread instead
+// of only a handful of distinct brands/categories.
+var (
+	bulkBrands = []string{
+		"Acme", "Globex", "Initech", "Umbrella", "Hooli", "Stark", "Wayne",
+		"Wonka", "Cyberdyne", "Soylent", "Tyrell", "Aperture", "BlackMesa",
+		"Massive", "Vandelay", "Gekko", "Prestige", "Oscorp", "Nakatomi", "Pied",
+	}
+	bulkCategories = []string{
+		"Electronics", "Home", "Sports", "Toys", "Office", "Garden", "Beauty",
+		"Automotive", "Grocery", "Books", "Pet", "Health",
+	}
+)
+
+// BulkPreset returns a zero-input config for seeding BulkGenerateCount
+// products. seed varies the data per run (dynamic), so no manual input is
+// needed; SKUs embed the seed so runs don't collide.
+func BulkPreset(seed int64) GenerateConfig {
+	return GenerateConfig{
+		Count:      BulkGenerateCount,
+		Prefix:     "BULK",
+		Seed:       seed,
+		PriceMin:   500,
+		PriceMax:   5_000_000,
+		Brands:     bulkBrands,
+		Categories: bulkCategories,
+		Tags:       defaultTags,
+		AttrMax:    4,
+	}
 }
 
 // pickTags returns a random subset (0..3) of pool, no duplicates.

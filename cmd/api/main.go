@@ -57,6 +57,7 @@ func main() {
 	mux.HandleFunc("GET /api/products/autocomplete", handleAutocomplete(osClient))
 	mux.HandleFunc("GET /api/products/export.xlsx", handleExport(osClient))
 	mux.HandleFunc("POST /api/products/generate", handleGenerate(repo, enableGenerator))
+	mux.HandleFunc("POST /api/products/generate/bulk", handleGenerateBulk(repo, enableGenerator))
 	mux.HandleFunc("GET /api/products/{id}", handleGet(repo))
 	mux.HandleFunc("POST /api/products", handleCreate(repo))
 	mux.HandleFunc("PUT /api/products/{id}", handleUpdate(repo))
@@ -170,20 +171,29 @@ func handleExport(c *search.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := parseParams(r)
 		p.Size = 100
-		p.Page = 1
 
 		var all []product.Product
 		for {
-			res, err := runSearch(r.Context(), c, p)
+			body, err := json.Marshal(search.BuildExport(p))
 			if err != nil {
 				httpx.Error(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			all = append(all, res.Items...)
-			if len(res.Items) < p.Size || int64(len(all)) >= res.Total {
+			raw, err := c.SearchRaw(r.Context(), body)
+			if err != nil {
+				httpx.Error(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			items, cursor, err := search.ParseExportPage(raw)
+			if err != nil {
+				httpx.Error(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			all = append(all, items...)
+			if len(items) < p.Size {
 				break
 			}
-			p.Page++
+			p.SearchAfter = cursor // next page starts after the last hit
 		}
 
 		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -225,6 +235,32 @@ func handleGenerate(repo *product.Repo, enabled bool) http.HandlerFunc {
 			return
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]int{"inserted": n})
+	}
+}
+
+// handleGenerateBulk seeds product.BulkGenerateCount products with no request
+// body. Data varies per run (time-based seed) and is streamed in chunks so
+// memory stays bounded regardless of the total.
+// ponytail: synchronous — a 500k seed takes a while; the client must allow a
+// long request. Move to a background job if that becomes a problem.
+func handleGenerateBulk(repo *product.Repo, enabled bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !enabled {
+			httpx.Error(w, http.StatusForbidden, "generator disabled")
+			return
+		}
+		cfg := product.BulkPreset(time.Now().UnixNano())
+		inserted := 0
+		err := product.GenerateStream(cfg, 2000, func(chunk []product.Product) error {
+			n, err := repo.BulkInsert(r.Context(), chunk, 500)
+			inserted += n
+			return err
+		})
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]int{"inserted": inserted})
 	}
 }
 
